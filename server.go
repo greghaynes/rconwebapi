@@ -5,7 +5,9 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	v1 "github.com/greghaynes/rconwebapi/api/v1"
 )
 
 const (
@@ -18,47 +20,6 @@ const (
 // Config holds configuration for the server
 type Config struct {
 	BindAddress string
-}
-
-type rconRequest struct {
-	Address  string
-	Password string
-	Command  string
-}
-
-type rconResponse struct {
-	Output string
-}
-
-type rconWSConnectRequest struct {
-	Address  string
-	Password string
-}
-
-type rconWSCommandRequest struct {
-	Command string
-}
-
-type rconWSRequest struct {
-	RequestType string
-	Request     json.RawMessage
-}
-
-type rconWsCommandResponse struct {
-	Output string
-}
-
-type rconWSResponse struct {
-	ResponseType string
-	Response     json.RawMessage
-}
-
-type rconReqBody struct {
-	RconRequest rconRequest
-}
-
-type rconResponseBody struct {
-	RconResponse rconResponse
 }
 
 // Server manages server state
@@ -84,24 +45,27 @@ func NewServer(config *Config) *Server {
 
 // Run starts the Server
 func (s *Server) Run() {
-	s.setupHandlers()
+	r := mux.NewRouter()
+	s.setupHandlers(r)
 	log.Fatal(http.ListenAndServe(s.config.BindAddress, nil))
 }
 
-func (s *Server) setupHandlers() {
-	http.HandleFunc("/", s.indexHandler)
-	http.HandleFunc("/rcon", s.rconHandler)
-	http.HandleFunc("/rcon_ws", s.rconWSHandler)
+func (s *Server) setupHandlers(r *mux.Router) {
+	r.HandleFunc("/", s.indexHandler).Methods("GET")
+
+	// Deprecated unversioned URL == v1
+	r.HandleFunc("/rcon", s.rconHandler).Methods("POST")
+	r.HandleFunc("/rcon_ws", s.rconWSHandler).Methods("POST")
+
+	// v1 handlers
+	r.HandleFunc("/v1/rcon", s.rconHandler).Methods("POST")
+	r.HandleFunc("/v1/rcon_ws", s.rconWSHandler).Methods("POST")
+
+	http.Handle("/", r)
 }
 
 func (s *Server) indexHandler(w http.ResponseWriter, req *http.Request) {
 	logRequest(req)
-
-	if req.Method != http.MethodGet {
-		invalidMethod(w)
-		return
-	}
-
 	w.Write([]byte("Hello!"))
 }
 
@@ -123,7 +87,7 @@ func (s *Server) rconWSHandler(w http.ResponseWriter, req *http.Request) {
 	var rconClient *RconClient
 
 	for {
-		var req rconWSRequest
+		var req v1.RconWSRequest
 		if err := conn.ReadJSON(&req); err != nil {
 			log.Printf("Failed to read websocket message: %v\n", err)
 			return
@@ -135,7 +99,7 @@ func (s *Server) rconWSHandler(w http.ResponseWriter, req *http.Request) {
 				continue
 			}
 
-			var connectReq rconWSConnectRequest
+			var connectReq v1.RconWSConnectRequest
 			if err = json.Unmarshal(req.Request, &connectReq); err != nil {
 				log.Printf("Failed to parse connect request: %v\n", err)
 				continue
@@ -152,7 +116,7 @@ func (s *Server) rconWSHandler(w http.ResponseWriter, req *http.Request) {
 				continue
 			}
 
-			var commandReq rconWSCommandRequest
+			var commandReq v1.RconWSCommandRequest
 			if err = json.Unmarshal(req.Request, &commandReq); err != nil {
 				log.Printf("Failed to parse command request: %v\n", err)
 				continue
@@ -164,14 +128,14 @@ func (s *Server) rconWSHandler(w http.ResponseWriter, req *http.Request) {
 				continue
 			}
 
-			commandResp, err := json.Marshal(rconWsCommandResponse{
+			commandResp, err := json.Marshal(v1.RconWsCommandResponse{
 				Output: resp,
 			})
 			if err != nil {
 				log.Printf("Failed to marshall command response: %v\n", err)
 				continue
 			}
-			response, err := json.Marshal(rconWSResponse{
+			response, err := json.Marshal(v1.RconWSResponse{
 				ResponseType: WSResponseTypeCommand,
 				Response:     commandResp,
 			})
@@ -190,11 +154,6 @@ func (s *Server) rconWSHandler(w http.ResponseWriter, req *http.Request) {
 func (s *Server) rconHandler(w http.ResponseWriter, req *http.Request) {
 	logRequest(req)
 
-	if req.Method != http.MethodPost {
-		invalidMethod(w)
-		return
-	}
-
 	ct := req.Header.Get("Content-Type")
 	if ct != "application/json" {
 		w.WriteHeader(http.StatusNotAcceptable)
@@ -203,7 +162,7 @@ func (s *Server) rconHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	decoder := json.NewDecoder(req.Body)
-	var reqBody rconReqBody
+	var reqBody v1.RconReqBody
 	if err := decoder.Decode(&reqBody); err != nil {
 		log.Printf("Failed to parse request: %v\n", err)
 		w.WriteHeader(http.StatusBadRequest)
@@ -217,8 +176,8 @@ func (s *Server) rconHandler(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte("Internal Error, command failed."))
 		return
 	}
-	respBody := rconResponseBody{
-		RconResponse: rconResponse{
+	respBody := v1.RconResponseBody{
+		RconResponse: v1.RconResponse{
 			Output: resp,
 		},
 	}
@@ -234,7 +193,7 @@ func (s *Server) rconHandler(w http.ResponseWriter, req *http.Request) {
 	w.Write(js)
 }
 
-func (s *Server) makeRconRequest(rconReq *rconRequest) (string, error) {
+func (s *Server) makeRconRequest(rconReq *v1.RconRequest) (string, error) {
 	client, err := NewRconClient(rconReq.Address, rconReq.Password)
 	if err != nil {
 		return "", err
