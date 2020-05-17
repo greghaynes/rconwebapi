@@ -2,6 +2,17 @@ package v1
 
 import "encoding/json"
 
+const (
+	// WSRequestTypeConnect is the request_type for connect messages
+	WSRequestTypeConnect = "connect"
+	// WSRequestTypeCommand is the request_type for command messages
+	WSRequestTypeCommand = "command"
+	// WSResponseTypeConnect is the response_type for connect messages
+	WSResponseTypeConnect = "connect"
+	// WSResponseTypeCommand is the response type for command messages
+	WSResponseTypeCommand = "command"
+)
+
 // RconRequest is used for the standard HTTP POST API
 type RconRequest struct {
 	Address  string `json:"address"`

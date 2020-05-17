@@ -10,13 +10,6 @@ import (
 	v1 "github.com/greghaynes/rconwebapi/api/v1"
 )
 
-const (
-	WSRequestTypeConnect  = "connect"
-	WSRequestTypeCommand  = "command"
-	WSResponseTypeConnect = "connect"
-	WSResponseTypeCommand = "command"
-)
-
 // Config holds configuration for the server
 type Config struct {
 	BindAddress string
@@ -93,7 +86,7 @@ func (s *Server) rconWSHandler(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		if req.RequestType == WSRequestTypeConnect {
+		if req.RequestType == v1.WSRequestTypeConnect {
 			if rconClient != nil {
 				log.Println("Got connect request when already connected")
 				continue
@@ -110,7 +103,7 @@ func (s *Server) rconWSHandler(w http.ResponseWriter, req *http.Request) {
 				log.Printf("Failed to connect to rcon: %v\n", err)
 			}
 			defer rconClient.Close()
-		} else if req.RequestType == WSRequestTypeCommand {
+		} else if req.RequestType == v1.WSRequestTypeCommand {
 			if rconClient == nil {
 				log.Println("Got command request while unconnected")
 				continue
@@ -136,7 +129,7 @@ func (s *Server) rconWSHandler(w http.ResponseWriter, req *http.Request) {
 				continue
 			}
 			response, err := json.Marshal(v1.RconWSResponse{
-				ResponseType: WSResponseTypeCommand,
+				ResponseType: v1.WSResponseTypeCommand,
 				Response:     commandResp,
 			})
 			if err != nil {
