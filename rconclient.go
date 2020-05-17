@@ -48,3 +48,17 @@ func (r *RconClient) connect() error {
 	r.conn = conn
 	return nil
 }
+
+func MakeRconRequest(address, password, command string) (string, error) {
+	client, err := NewRconClient(address, password)
+	if err != nil {
+		return "", err
+	}
+	defer client.Close()
+
+	resp, err := client.Execute(command)
+	if err != nil {
+		return "", err
+	}
+	return resp, nil
+}

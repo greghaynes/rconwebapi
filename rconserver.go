@@ -10,18 +10,9 @@ import (
 	v1 "github.com/greghaynes/rconwebapi/api/v1"
 )
 
-// Config holds configuration for the server
-type Config struct {
-	BindAddress string
-}
-
-// Server manages server state
-type Server struct {
+// RconServer manages server state
+type RconServer struct {
 	config *Config
-}
-
-func logRequest(req *http.Request) {
-	log.Printf("Got %q request from %q for %q\n", req.Method, req.RemoteAddr, req.URL)
 }
 
 func invalidMethod(w http.ResponseWriter) {
@@ -29,21 +20,15 @@ func invalidMethod(w http.ResponseWriter) {
 	w.Write([]byte("Method not allowed."))
 }
 
-// NewServer creates a new server
-func NewServer(config *Config) *Server {
-	return &Server{
+// NewRconServer creates a new server
+func NewRconServer(config *Config) *RconServer {
+	return &RconServer{
 		config: config,
 	}
 }
 
-// Run starts the Server
-func (s *Server) Run() {
-	r := mux.NewRouter()
-	s.setupHandlers(r)
-	log.Fatal(http.ListenAndServe(s.config.BindAddress, nil))
-}
-
-func (s *Server) setupHandlers(r *mux.Router) {
+// SetupHandlers adds handlers for rcon server
+func (s *RconServer) SetupHandlers(r *mux.Router) {
 	r.HandleFunc("/", s.indexHandler).Methods("GET")
 
 	// Deprecated unversioned URL == v1
@@ -53,17 +38,15 @@ func (s *Server) setupHandlers(r *mux.Router) {
 	// v1 handlers
 	r.HandleFunc("/v1/rcon", s.rconHandler).Methods("POST")
 	r.HandleFunc("/v1/rcon_ws", s.rconWSHandler).Methods("POST")
-
-	http.Handle("/", r)
 }
 
-func (s *Server) indexHandler(w http.ResponseWriter, req *http.Request) {
-	logRequest(req)
+func (s *RconServer) indexHandler(w http.ResponseWriter, req *http.Request) {
+	LogRequest(req)
 	w.Write([]byte("Hello!"))
 }
 
-func (s *Server) rconWSHandler(w http.ResponseWriter, req *http.Request) {
-	logRequest(req)
+func (s *RconServer) rconWSHandler(w http.ResponseWriter, req *http.Request) {
+	LogRequest(req)
 
 	var upgrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
@@ -144,8 +127,8 @@ func (s *Server) rconWSHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (s *Server) rconHandler(w http.ResponseWriter, req *http.Request) {
-	logRequest(req)
+func (s *RconServer) rconHandler(w http.ResponseWriter, req *http.Request) {
+	LogRequest(req)
 
 	ct := req.Header.Get("Content-Type")
 	if ct != "application/json" {
@@ -186,16 +169,6 @@ func (s *Server) rconHandler(w http.ResponseWriter, req *http.Request) {
 	w.Write(js)
 }
 
-func (s *Server) makeRconRequest(rconReq *v1.RconRequest) (string, error) {
-	client, err := NewRconClient(rconReq.Address, rconReq.Password)
-	if err != nil {
-		return "", err
-	}
-	defer client.Close()
-
-	resp, err := client.Execute(rconReq.Command)
-	if err != nil {
-		return "", err
-	}
-	return resp, nil
+func (s *RconServer) makeRconRequest(rconReq *v1.RconRequest) (string, error) {
+	return MakeRconRequest(rconReq.Address, rconReq.Password, rconReq.Command)
 }
