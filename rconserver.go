@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
@@ -131,7 +132,7 @@ func (s *RconServer) rconHandler(w http.ResponseWriter, req *http.Request) {
 	LogRequest(req)
 
 	ct := req.Header.Get("Content-Type")
-	if ct != "application/json" {
+	if !strings.HasPrefix(ct, "application/json") {
 		w.WriteHeader(http.StatusNotAcceptable)
 		w.Write(([]byte("Ivalid Content-Type, only application/json allowed.")))
 		return
