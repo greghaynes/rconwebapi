@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -50,15 +51,36 @@ func (s *StateServer) handleStatus(w http.ResponseWriter, req *http.Request) {
 }
 
 func statusToResponse(status string) *v1.StatusResponse {
-	statusSplit := strings.SplitN(status, "\n", 3)
+	statusSplit := strings.SplitN(status, "\n", 8)
 
 	hostname := removeFieldPrefix(statusSplit[0])
 	version := removeFieldPrefix(statusSplit[1])
+	map_name := removeFieldPrefix(statusSplit[5])
+	playersline := removeFieldPrefix(statusSplit[6])
+
+	humans, bots := parsePlayersLine(playersline)
+	players := v1.PlayersObject{HumanPlayers: humans, BotPlayers: bots}
 
 	return &v1.StatusResponse{
 		Hostname: hostname,
 		Version:  version,
+		Map:      map_name,
+		Players:  players,
 	}
+}
+
+func parsePlayersLine(line string) (int, int) {
+	lineSplit := strings.SplitN(line, " ", 4)
+	humans, err := strconv.Atoi(lineSplit[0])
+	if err != nil {
+		log.Fatal(err)
+	}
+	bots, err := strconv.Atoi(lineSplit[2])
+	if err != nil {
+		log.Fatal(err)
+	}
+	return humans, bots
+
 }
 
 func removeFieldPrefix(line string) string {
