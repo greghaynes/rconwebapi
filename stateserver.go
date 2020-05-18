@@ -57,9 +57,11 @@ func statusToResponse(status string) *v1.StatusResponse {
 	version := removeFieldPrefix(statusSplit[1])
 	map_name := removeFieldPrefix(statusSplit[5])
 	playersline := removeFieldPrefix(statusSplit[6])
+	rest := statusSplit[7]
 
 	humans, bots := parsePlayersLine(playersline)
-	players := v1.PlayersObject{HumanPlayers: humans, BotPlayers: bots}
+	allPlayers := parseAllPlayers(rest)
+	players := v1.PlayersObject{HumanPlayers: humans, BotPlayers: bots, Players: allPlayers}
 
 	return &v1.StatusResponse{
 		Hostname: hostname,
@@ -81,6 +83,47 @@ func parsePlayersLine(line string) (int, int) {
 	}
 	return humans, bots
 
+}
+
+func parseAllPlayers(rest string) []v1.Player {
+	players := make([]v1.Player, 0)
+	//clean up input string
+	trimmed := strings.TrimPrefix(strings.TrimSuffix(rest, "\n#end\n"), "\n")
+	lines := strings.Split(trimmed, "\n")
+	for idx, line := range lines {
+		// removes header line
+		if idx == 0 {
+			continue
+		}
+		split := strings.Split(line, " ")
+		// skip bots
+		if split[2] == "BOT" {
+			continue
+		}
+		ping, err := strconv.Atoi(split[6])
+		if err != nil {
+			log.Fatal(err)
+		}
+		loss, err := strconv.Atoi(split[7])
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		player := v1.Player{
+			Userid:        split[1],
+			Name:          split[3],
+			Uniqueid:      split[4],
+			TimeConnected: split[5],
+			Ping:          ping,
+			Loss:          loss,
+			State:         split[8],
+			Rate:          split[9],
+			Address:       split[10],
+		}
+		players = append(players, player)
+
+	}
+	return players
 }
 
 func removeFieldPrefix(line string) string {
