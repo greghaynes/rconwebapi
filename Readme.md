@@ -14,6 +14,12 @@ Run the server binary:
 ./rconwebapi -host 127.0.0.1:8099
 ```
 
+## Part of the Rcon Family of tools
+
+- <https://github.com/chromakode/rconwebui>
+- <https://github.com/greghaynes/rconwebapi>
+- <https://github.com/nibalizer/rcondiscordbot>
+
 
 # API
 
